@@ -40,6 +40,8 @@ class EmailMessage(object):
     QUOTE_HDR_REGEX = re.compile('On.*wrote:$')
     QUOTED_REGEX = re.compile(r'(>+)')
     HEADER_REGEX = re.compile(r'^\*?(From|Sent|To|Subject):\*? .+')
+    # More specific regex for From headers that contain email addresses
+    FROM_EMAIL_REGEX = re.compile(r'^\*?From:\*?.*@.*')
     _MULTI_QUOTE_HDR_REGEX = r'(?!On.*On\s.+?wrote:)(On\s(.+?)wrote:)'
     MULTI_QUOTE_HDR_REGEX = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL | re.MULTILINE)
     MULTI_QUOTE_HDR_REGEX_MULTILINE = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL)
@@ -66,6 +68,12 @@ class EmailMessage(object):
         # Fix any outlook style replies, with the reply immediately above the signature boundary line
         #   See email_2_2.txt for an example
         self.text = re.sub('([^\n])(?=\n ?[_-]{7,})', '\\1\n', self.text, re.MULTILINE)
+
+        # Fix inline headers by adding line breaks before them
+        # This helps parse headers that appear without line breaks
+        # Only split when we detect a complete email header sequence with email addresses
+        # Look for From: with email address followed by other headers
+        self.text = re.sub(r'(?<!\n)(?<!\*)(From:[^@\n]*@[^\n]*?(?:Sent:|To:|Subject:)[^\n]*?(?:Sent:|To:|Subject:))', r'\n\1', self.text)
 
         self.lines = self.text.split('\n')
         self.lines.reverse()
@@ -96,7 +104,10 @@ class EmailMessage(object):
         """
         is_quote_header = self.QUOTE_HDR_REGEX.match(line) is not None
         is_quoted = self.QUOTED_REGEX.match(line) is not None
-        is_header = is_quote_header or self.HEADER_REGEX.match(line) is not None
+        # Use more specific logic for From headers to avoid matching body text like "From: the beginning..."
+        is_from_header = line.startswith('From:') and self.FROM_EMAIL_REGEX.match(line) is not None
+        is_other_header = self.HEADER_REGEX.match(line) is not None and not line.startswith('From:')
+        is_header = is_quote_header or is_from_header or is_other_header
 
         if self.fragment and len(line.strip()) == 0:
             if self.SIG_REGEX.match(self.fragment.lines[-1].strip()):
