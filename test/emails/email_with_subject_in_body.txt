@@ -1,0 +1,10 @@
+Here is my reply to your message.
+
+Subject to change, I think we should proceed. The subject matter is quite important.
+
+From: sender@example.com
+Sent: Monday, January 1, 2024 1:00 PM
+To: recipient@example.com
+Subject: Previous message
+
+This is the previous email content.
