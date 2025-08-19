@@ -265,6 +265,18 @@ sent: you an email yesterday about this topic.
 to: summarize what we discussed, I think we should proceed.
 subject: to change, I think we should proceed."""
         self.assertEqual(expected_reply, reply)
+
+    def test_email_whole_is_first(self):
+        """Test parsing of email where the whole content is considered the first email"""
+        message = self.get_email('email_whole_is_first')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """New email body
+From: Jonathan
+To: Jeremy
+Hey wassup?"""
+        self.assertEqual(expected_reply, reply)
         
     def get_email(self, name):
         """ Return EmailMessage instance
