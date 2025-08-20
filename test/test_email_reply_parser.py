@@ -277,7 +277,21 @@ From: Jonathan
 To: Jeremy
 Hey wassup?"""
         self.assertEqual(expected_reply, reply)
+
+    def test_email_body_unusual(self):
+        """Test parsing of email with unusual body format where the whole content is considered the first email"""
+        message = self.get_email('email_body_unusual')
         
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """New body
+
+From: Someone
+To: Another person
+
+More stuff here"""
+        self.assertEqual(expected_reply, reply)
+
     def get_email(self, name):
         """ Return EmailMessage instance
         """
