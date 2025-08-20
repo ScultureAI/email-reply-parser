@@ -1,0 +1,10 @@
+Here is my reply to your message.
+
+I sent you an email yesterday about this topic. To summarize what we discussed, I think we should proceed.
+
+From: sender@example.com
+Sent: Monday, January 1, 2024 1:00 PM
+To: recipient@example.com
+Subject: Previous message
+
+This is the previous email content.

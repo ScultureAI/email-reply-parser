@@ -189,6 +189,109 @@ class EmailMessageTest(unittest.TestCase):
         message = self.get_email('email_sig_delimiter_in_middle_of_line')
         self.assertEqual(1, len(message.fragments))
 
+    def test_inline_email_body_format(self):
+        """Test parsing of email with inline headers in email_body.txt"""
+        message = self.get_email('email_body')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        self.assertEqual("New email body", reply)
+        
+    def test_email_with_from_in_body(self):
+        """Test parsing of email that contains 'From:' text in the body"""
+        message = self.get_email('email_with_from_in_body')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """Here is my reply to your message.
+
+From: the beginning, I thought this was a good idea. I sent you an email yesterday about this topic. To summarize what we discussed, I think we should proceed."""
+        self.assertEqual(expected_reply, reply)
+
+    def test_email_with_sent_in_body(self):
+        """Test parsing of email that contains 'Sent:' text in the body"""
+        message = self.get_email('email_with_sent_in_body')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """Here is my reply to your message.
+
+I sent you an email yesterday about this topic. To summarize what we discussed, I think we should proceed."""
+        self.assertEqual(expected_reply, reply)
+
+    def test_email_with_to_in_body(self):
+        """Test parsing of email that contains 'To:' text in the body"""
+        message = self.get_email('email_with_to_in_body')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """Here is my reply to your message.
+
+To summarize what we discussed, I think we should proceed. To be clear, I want to make sure we're on the same page."""
+        self.assertEqual(expected_reply, reply)
+
+    def test_email_with_subject_in_body(self):
+        """Test parsing of email that contains 'Subject:' text in the body"""
+        message = self.get_email('email_with_subject_in_body')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """Here is my reply to your message.
+
+Subject to change, I think we should proceed. The subject matter is quite important."""
+        self.assertEqual(expected_reply, reply)
+
+    def test_email_case_insensitive_headers(self):
+        """Test parsing of email with lowercase header words in body text"""
+        message = self.get_email('email_case_insensitive_headers')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """Here is my reply to your message.
+
+from: the beginning, I thought this was a good idea. I sent you an email yesterday about this topic. To summarize what we discussed, I think we should proceed."""
+        self.assertEqual(expected_reply, reply)
+
+    def test_email_all_lowercase_headers(self):
+        """Test parsing of email with all lowercase header words in body text"""
+        message = self.get_email('email_all_lowercase_headers')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """Here is my reply to your message.
+
+from: the beginning, I thought this was a good idea.
+sent: you an email yesterday about this topic.
+to: summarize what we discussed, I think we should proceed.
+subject: to change, I think we should proceed."""
+        self.assertEqual(expected_reply, reply)
+
+    def test_email_whole_is_first(self):
+        """Test parsing of email where the whole content is considered the first email"""
+        message = self.get_email('email_whole_is_first')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """New email body
+From: Jonathan
+To: Jeremy
+Hey wassup?"""
+        self.assertEqual(expected_reply, reply)
+
+    def test_email_body_unusual(self):
+        """Test parsing of email with unusual body format where the whole content is considered the first email"""
+        message = self.get_email('email_body_unusual')
+        
+        # Test that the latest reply is extracted correctly
+        reply = EmailReplyParser.parse_reply(message.text)
+        expected_reply = """New body
+
+From: Someone
+To: Another person
+
+More stuff here"""
+        self.assertEqual(expected_reply, reply)
+
     def get_email(self, name):
         """ Return EmailMessage instance
         """

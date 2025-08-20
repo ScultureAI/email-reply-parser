@@ -40,6 +40,16 @@ class EmailMessage(object):
     QUOTE_HDR_REGEX = re.compile('On.*wrote:$')
     QUOTED_REGEX = re.compile(r'(>+)')
     HEADER_REGEX = re.compile(r'^\*?(From|Sent|To|Subject):\*? .+')
+    # More specific regex for From headers that contain email addresses
+    FROM_EMAIL_REGEX = re.compile(r'^\*?From:\*?.*@.*')
+    # More specific regex for To headers that contain email addresses
+    TO_EMAIL_REGEX = re.compile(r'^\*?To:\*?.*@.*')
+    # More specific regex for Sent headers that contain date/time patterns
+    SENT_EMAIL_REGEX = re.compile(r'^\*?Sent:\*?.*\d{1,2}.*\d{4}.*')
+    # More specific regex for Subject headers
+    SUBJECT_EMAIL_REGEX = re.compile(r'^\*?Subject:\*?.*')
+    # Regex for asterisk-wrapped headers (Outlook format)
+    ASTERISK_HEADER_REGEX = re.compile(r'^\*?(From|Sent|To|Subject):\*?.*')
     _MULTI_QUOTE_HDR_REGEX = r'(?!On.*On\s.+?wrote:)(On\s(.+?)wrote:)'
     MULTI_QUOTE_HDR_REGEX = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL | re.MULTILINE)
     MULTI_QUOTE_HDR_REGEX_MULTILINE = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL)
@@ -66,6 +76,12 @@ class EmailMessage(object):
         # Fix any outlook style replies, with the reply immediately above the signature boundary line
         #   See email_2_2.txt for an example
         self.text = re.sub('([^\n])(?=\n ?[_-]{7,})', '\\1\n', self.text, re.MULTILINE)
+
+        # Fix inline headers by adding line breaks before them
+        # This helps parse headers that appear without line breaks
+        # Only split when we detect a complete email header sequence with email addresses
+        # Look for From: with email address followed by other headers
+        self.text = re.sub(r'(?<!\n)(?<!\*)(From:[^@\n]*@[^\n]*?(?:Sent:|To:|Subject:)[^\n]*?(?:Sent:|To:|Subject:))', r'\n\1', self.text)
 
         self.lines = self.text.split('\n')
         self.lines.reverse()
@@ -96,7 +112,17 @@ class EmailMessage(object):
         """
         is_quote_header = self.QUOTE_HDR_REGEX.match(line) is not None
         is_quoted = self.QUOTED_REGEX.match(line) is not None
-        is_header = is_quote_header or self.HEADER_REGEX.match(line) is not None
+        
+        # Check for asterisk-wrapped headers first (Outlook format)
+        is_asterisk_header = self.ASTERISK_HEADER_REGEX.match(line) is not None and line.count('*') >= 2
+        
+        # Use more specific logic for regular headers to avoid matching body text
+        is_from_header = line.startswith('From:') and not line.startswith('*From:') and self.FROM_EMAIL_REGEX.match(line) is not None
+        is_to_header = line.startswith('To:') and not line.startswith('*To:') and self.TO_EMAIL_REGEX.match(line) is not None
+        is_sent_header = line.startswith('Sent:') and not line.startswith('*Sent:') and self.SENT_EMAIL_REGEX.match(line) is not None
+        is_subject_header = line.startswith('Subject:') and not line.startswith('*Subject:') and self.SUBJECT_EMAIL_REGEX.match(line) is not None
+        
+        is_header = is_quote_header or is_asterisk_header or is_from_header or is_to_header or is_sent_header or is_subject_header
 
         if self.fragment and len(line.strip()) == 0:
             if self.SIG_REGEX.match(self.fragment.lines[-1].strip()):
