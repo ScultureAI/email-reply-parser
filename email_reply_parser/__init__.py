@@ -31,6 +31,16 @@ class EmailReplyParser(object):
         """
         return EmailReplyParser.read(text).reply
 
+    @staticmethod
+    def parse_chain(text):
+        """ Provides the email chain portion (quoted/forwarded content).
+
+            text - A string email body
+
+            Returns email chain content
+        """
+        return EmailReplyParser.read(text).chain
+
 
 class EmailMessage(object):
     """ An email message represents a parsed email body.
@@ -104,6 +114,16 @@ class EmailMessage(object):
             if not (f.hidden or f.quoted):
                 reply.append(f.content)
         return '\n'.join(reply)
+
+    @property
+    def chain(self):
+        """ Captures email chain content (quoted/forwarded portions)
+        """
+        chain = []
+        for f in self.fragments:
+            if f.hidden or f.quoted:
+                chain.append(f.content)
+        return '\n'.join(chain)
 
     def _scan_line(self, line):
         """ Reviews each line in email message and determines fragment type
