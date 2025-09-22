@@ -92,6 +92,28 @@ class EmailMessageTest(unittest.TestCase):
 
         self.assertEqual(1, len(message.fragments))
 
+    def test_newline_before_bullet_points(self):
+        """Test that parser correctly handles newlines before bullet points in reply content."""
+        # Read the raw email content
+        with open('test/emails/dashes.txt') as f:
+            email_content = f.read()
+        
+        # The parsed reply should include the bullet points and the final line
+        parsed_reply = EmailReplyParser.parse_reply(email_content)
+        
+        # Expected exact content
+        expected_reply = """Hi Ellie,
+Oh - sorry, looks like the formatting of my below email was a bit off. Sharing the details
+again for the event if you can make it:
+
+-Upskilling and reskilling our workforce
+-Something else
+-Another thing
+
+You'll also hear from zyz"""
+        
+        self.assertEqual(expected_reply, parsed_reply)
+
     def test_verify_reads_signature_correct(self):
         message = self.get_email('correct_sig')
         self.assertEqual(2, len(message.fragments))

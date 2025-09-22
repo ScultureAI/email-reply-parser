@@ -145,9 +145,38 @@ class EmailMessage(object):
         is_header = is_quote_header or is_asterisk_header or is_from_header or is_to_header or is_sent_header or is_subject_header
 
         if self.fragment and len(line.strip()) == 0:
-            if self.SIG_REGEX.match(self.fragment.lines[-1].strip()):
-                self.fragment.signature = True
-                self._finish_fragment()
+            last_line = self.fragment.lines[-1].strip()
+            if self.SIG_REGEX.match(last_line):
+                # Check if this looks like a real signature or content
+                is_signature = False
+                
+                if last_line.startswith('Sent from my'):
+                    is_signature = True
+                elif last_line.startswith('--') and not any(c.isalpha() for c in last_line):
+                    # Pure dash separators like "--------"
+                    is_signature = True
+                elif last_line.startswith('__') and not any(c.isalpha() for c in last_line):
+                    # Pure underscore separators
+                    is_signature = True
+                elif last_line.startswith('-') and len(last_line.split()) <= 3:
+                    # Single dash lines - check if it's part of a bullet list
+                    # Count consecutive lines starting with single dash
+                    consecutive_dash_lines = 0
+                    for i in range(len(self.fragment.lines) - 1, -1, -1):
+                        line_content = self.fragment.lines[i].strip()
+                        if line_content.startswith('-') and not line_content.startswith('--'):
+                            consecutive_dash_lines += 1
+                        else:
+                            break
+                    
+                    # If there are multiple consecutive dash lines, it's likely a bullet list (content)
+                    # If it's just one line, it's likely a signature
+                    if consecutive_dash_lines == 1:
+                        is_signature = True
+                
+                if is_signature:
+                    self.fragment.signature = True
+                    self._finish_fragment()
 
         if self.fragment \
                 and ((self.fragment.headers == is_header and self.fragment.quoted == is_quoted) or
