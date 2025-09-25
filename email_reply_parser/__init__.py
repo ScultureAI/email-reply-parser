@@ -60,6 +60,8 @@ class EmailMessage(object):
     SUBJECT_EMAIL_REGEX = re.compile(r'^\*?Subject:\*?.*')
     # Regex for asterisk-wrapped headers (Outlook format)
     ASTERISK_HEADER_REGEX = re.compile(r'^\*?(From|Sent|To|Subject):\*?.*')
+    # Regex for concatenated headers (multiple headers on one line)
+    CONCATENATED_HEADERS_REGEX = re.compile(r'From:.*Sent:.*To:.*Subject:')
     _MULTI_QUOTE_HDR_REGEX = r'(?!On.*On\s.+?wrote:)(On\s(.+?)wrote:)'
     MULTI_QUOTE_HDR_REGEX = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL | re.MULTILINE)
     MULTI_QUOTE_HDR_REGEX_MULTILINE = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL)
@@ -136,13 +138,16 @@ class EmailMessage(object):
         # Check for asterisk-wrapped headers first (Outlook format)
         is_asterisk_header = self.ASTERISK_HEADER_REGEX.match(line) is not None and line.count('*') >= 2
         
+        # Check for concatenated headers (multiple headers on one line)
+        is_concatenated_headers = self.CONCATENATED_HEADERS_REGEX.search(line) is not None
+        
         # Use more specific logic for regular headers to avoid matching body text
         is_from_header = line.startswith('From:') and not line.startswith('*From:') and self.FROM_EMAIL_REGEX.match(line) is not None
         is_to_header = line.startswith('To:') and not line.startswith('*To:') and self.TO_EMAIL_REGEX.match(line) is not None
         is_sent_header = line.startswith('Sent:') and not line.startswith('*Sent:') and self.SENT_EMAIL_REGEX.match(line) is not None
         is_subject_header = line.startswith('Subject:') and not line.startswith('*Subject:') and self.SUBJECT_EMAIL_REGEX.match(line) is not None
         
-        is_header = is_quote_header or is_asterisk_header or is_from_header or is_to_header or is_sent_header or is_subject_header
+        is_header = is_quote_header or is_asterisk_header or is_concatenated_headers or is_from_header or is_to_header or is_sent_header or is_subject_header
 
         if self.fragment and len(line.strip()) == 0:
             last_line = self.fragment.lines[-1].strip()
@@ -153,8 +158,24 @@ class EmailMessage(object):
                 if last_line.startswith('Sent from my'):
                     is_signature = True
                 elif last_line.startswith('--') and not any(c.isalpha() for c in last_line):
-                    # Pure dash separators like "--------"
-                    is_signature = True
+                    # Pure dash separators like "--------" 
+                    # Only apply look-ahead for long dash lines (8+ characters) that might be content separators
+                    if len(last_line) >= 8:
+                        # Check if there's substantial content after this line that suggests it's a content separator
+                        remaining_lines = self.text.split('\n')[self.text.count('\n', 0, self.text.find(last_line)) + 1:]
+                        
+                        # Look for signs this is quoted content (email headers, etc.) vs meaningful content
+                        has_email_headers = any('From:' in line or 'Sent:' in line or 'Subject:' in line for line in remaining_lines[:5])
+                        meaningful_content_lines = [l for l in remaining_lines if l.strip() and len(l.strip()) > 20 and not l.strip().startswith('*') and 'From:' not in l and 'Sent:' not in l]
+                        
+                        # Only treat as content separator if there's substantial meaningful content AND no email headers
+                        if len(meaningful_content_lines) >= 3 and not has_email_headers:
+                            pass  # Don't mark as signature - treat as content separator
+                        else:
+                            is_signature = True
+                    else:
+                        # Short dash patterns like "--" are always signatures
+                        is_signature = True
                 elif last_line.startswith('__') and not any(c.isalpha() for c in last_line):
                     # Pure underscore separators
                     is_signature = True
