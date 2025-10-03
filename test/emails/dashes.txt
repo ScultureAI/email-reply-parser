@@ -1,4 +1,4 @@
-Hi Ellie,
+Hi NAME,
 Oh - sorry, looks like the formatting of my below email was a bit off. Sharing the details
 again for the event if you can make it:
 
@@ -6,14 +6,14 @@ again for the event if you can make it:
 -Something else
 -Another thing
 
-You'll also hear from zyz
+You'll also hear from [SPEAKER]
 
 
-From: Chris O'Brien <chris.obrien@sculture.ai>
-Sent: 11 September 2025 5:26 PM
-To: Ellie Woodhams <ellie.woodhams@hyperexponential.com>
-Subject: Re: ScultureAI / Hyperexponential - Further Information
-Hi Ellie, Hopefully we can find a time to reconnect soon once you have had a chance to
+From: SENDER_NAME SENDER_EMAIL
+Sent: DATE TIME
+To: RECIPIENT_NAME  RECIPIENT_EMAIL
+Subject: Re: COMPANY_A / COMPANY_B - Further Information
+Hi NAME, Hopefully we can find a time to reconnect soon once you have had a chance to
 speak with your VP People.
 In the meantime, I'd love to personally invite you and your VP People to the Business
 Culture Connected Conference on Thursday 25th September in London. It's a free, half-day
