@@ -10,6 +10,8 @@ from email_reply_parser import EmailReplyParser
 
 
 class EmailMessageTest(unittest.TestCase):
+    def setUp(self):
+        self.maxDiff = None
     def test_simple_body(self):
         message = self.get_email('email_1_1')
 
@@ -91,6 +93,33 @@ class EmailMessageTest(unittest.TestCase):
         message = self.get_email('email_1_5')
 
         self.assertEqual(1, len(message.fragments))
+
+    def test_newline_before_bullet_points(self):
+        """Test that parser correctly handles newlines before bullet points in reply content."""
+        # Read the raw email content
+        with open('test/emails/dashes.txt') as f:
+            email_content = f.read()
+        
+        # The parsed reply should include the bullet points and the final line
+        parsed_reply = EmailReplyParser.parse_reply(email_content)
+        
+        # Expected exact content
+        expected_reply = """Hi NAME,
+Oh - sorry, looks like the formatting of my below email was a bit off. Sharing the details
+again for the event if you can make it:
+
+-Upskilling and reskilling our workforce
+-Something else
+-Another thing
+
+You'll also hear from [SPEAKER]
+
+
+From: SENDER_NAME SENDER_EMAIL
+Sent: DATE TIME
+To: RECIPIENT_NAME  RECIPIENT_EMAIL"""
+        
+        self.assertEqual(expected_reply, parsed_reply)
 
     def test_verify_reads_signature_correct(self):
         message = self.get_email('correct_sig')
@@ -1044,6 +1073,138 @@ Sent from a magnificent torch of pixels"""
 > https://github.com/github/github/issues/2278#issuecomment-3182418
 """
         self.assertEqual(expected_chain, chain)
+
+    def test_concatenated_headers_split(self):
+        """ Test that concatenated headers properly split reply from chain """
+        message = self.get_email('unsplit_conversation')
+        
+        # Should have 3 fragments: reply, headers, chain
+        self.assertEqual(3, len(message.fragments))
+        
+        # Fragment 0: reply (visible)
+        self.assertFalse(message.fragments[0].hidden)
+        self.assertFalse(message.fragments[0].headers)
+        self.assertIn("Thanks, NAME_A", message.fragments[0].content)
+        self.assertIn("SENDER_NAME", message.fragments[0].content)
+        
+        # Fragment 1: headers (hidden)
+        self.assertTrue(message.fragments[1].hidden)
+        self.assertTrue(message.fragments[1].headers)
+        self.assertIn("From:", message.fragments[1].content)
+        self.assertIn("ORIGINAL_SENDER", message.fragments[1].content)
+        self.assertIn("Subject:", message.fragments[1].content)
+        
+        # Fragment 2: chain content (hidden)
+        self.assertTrue(message.fragments[2].hidden)
+        self.assertFalse(message.fragments[2].headers)
+        self.assertIn("Hi RECIPIENT_NAME", message.fragments[2].content)
+        self.assertIn("COMPANY_B", message.fragments[2].content)
+        
+        # Test parse_reply and parse_chain
+        reply = EmailReplyParser.parse_reply(message.text)
+        chain = EmailReplyParser.parse_chain(message.text)
+        
+        # Expected exact reply content (lines 1-17 of the file)
+        expected_reply = """Thanks, NAME_A, and likewise good to speak last week. Congrats again on the new move/venture, and thanks for sharing the article.
+
+Would be great to meet PERSON_A and PERSON_B on the w/c 29th - please see some proposed times below that myself and COLLEAGUE can meet in person, either at your LOCATION_A office or in our LOCATION_B office.  Let us know if any of these are convenient.
+
+Monday 29th: 845-945am, 1230-130pm
+Tuesday 30th: 5-6pm
+Friday 3rd: 830-930, 12-1pm
+
+Would also be good to reconnect with PERSON_C and PERSON_D. As mentioned, COLLEAGUE is leading on our commercial functions so most important that he is there, but I will join as well if I can. Looking at diaries, Thursday 1230-2 this week works if that is good for you also?
+
+Thanks and best wishes,
+
+SENDER_NAME
+SENDER_NAME TITLE &
+Co-founderCOMPANY_A
+Limitede: SENDER_EMAIL PHONE_NUMBER
+PHONE_EXT"""
+        expected_chain = \
+"""From: ORIGINAL_SENDER ORIGINAL_EMAILSent: DATE TIMETo: RECIPIENT_NAME RECIPIENT_EMAILCc: PERSON_C; PERSON_DSubject: Follow-up
+Hi RECIPIENT_NAME Good to speak to you last week. 
+ As promised, I'd like to arrange for you to meet with PERSON_A (COMPANY_B CEO) and PERSON_B (COMPANY_B Head of People) when they are in the UK w/c 29th Sept. to
+ demo the produce and see how we may be able to work with you with a pilot study.  Are there days that work better for you that week? In the meantime, I think it would be helpful to arrange a catch up with PERSON_C, PERSON_D and me this week if you have time.  I have gaps Wednesday and Thursday if
+ that could work for you? And by way of background to the move, here is the Press Release announcing the recent launch. 
+Ex-LAW_FIRM group launches London
+ office for German tech law firm - The Global Legal Post As to what our move means for COMPANY_A??  It is my firm belief that your business is in way better hands with us here than we were at LAW_FIRM.  Not only are we are working
+ on a better platform, but we are optimising efficiencies in our service delivery through the active development and use of tech, and our primary (not peripheral) focus is on supporting the best European technology companies as they grow. I do hope we can continue
+ to work together. Best ORIGINAL_SENDER 
+--
+COMPANY_B
+ORIGINAL_SENDER TITLE
+ADDRESS_LINE_1 | CITY | POSTAL_CODE | COUNTRY
+ORIGINAL_EMAIL |
+
+WEBSITE
+
+
+
+
+Confidential e-mail fromCOMPANY_B GmbH & Co. KG (acting by its UK establishment)Seat, Register: Berlin, Local Court of Charlottenburg HRA 64430 B
+Personally liable partner: COMPANY_B Management GmbH
+Seat, Register: Berlin, Local Court of Charlottenburg HRB 276012 B
+Managing Directors:
+DIRECTOR_A
+DIRECTOR_B
+Notice: COMPANY_B Partnerschaft von Rechtsanwälten und Steuerberatern mbB Schnittker + Partner changed its legal form and company name on July 2, 2025 following an identity-preserving status change (§ 707c BGB).
+
+
+Please note our privacy policy, which you can view here."""
+        # Reply should contain exactly Elie's message
+        self.assertEqual(expected_reply, reply)
+        self.assertEqual(expected_chain, chain)
+        
+        # Chain should contain key components and not leak reply content
+        self.assertIn("From:", chain)
+        self.assertIn("ORIGINAL_SENDER", chain)
+        self.assertIn("Subject:", chain)
+        self.assertIn("Hi RECIPIENT_NAME", chain)
+        self.assertIn("COMPANY_B", chain)
+        self.assertIn("Confidential e-mail", chain)
+        self.assertIn("privacy policy", chain)
+        
+        # Ensure chain doesn't contain reply content
+        self.assertNotIn("Thanks, NAME_A, and likewise good to speak last week", chain)
+        self.assertNotIn("Would be great to meet PERSON_A and PERSON_B", chain)
+
+    def test_dashes_as_content_separator(self):
+        """ Test that long dash lines followed by meaningful content are treated as separators """
+        # Test separator-border.txt
+        message = self.get_email('separator-border')
+        reply = EmailReplyParser.parse_reply(message.text)
+        
+        # Should include content before and after the dashes
+        self.assertIn("Thanks, NAME", reply)
+        self.assertIn("Let me know what you think", reply)
+        self.assertIn("SENDER_NAME", reply)
+        self.assertIn("--------", reply)
+        self.assertIn("@COMPANY_A CPO Accelerate programme", reply)
+        self.assertIn("@COMPANY_B", reply)
+        self.assertIn("#WorkplaceCulture", reply)
+        
+        # Should be treated as one continuous reply, not split
+        self.assertEqual(1, len([f for f in message.fragments if not f.hidden]))
+
+    def test_dashes2_as_content_separator(self):
+        """ Test that dashes2.txt treats dash line as content separator """
+        message = self.get_email('dashes2')
+        reply = EmailReplyParser.parse_reply(message.text)
+        
+        # Should include content before and after the dashes
+        self.assertIn("Thanks, NAME", reply)
+        self.assertIn("proposed version below", reply)
+        self.assertIn("--------", reply)
+        self.assertIn("@COMPANY_A", reply)
+        self.assertIn("CPO Accelerate programme", reply)
+        self.assertIn("COMPANY_B", reply)
+        self.assertIn("#COMPANY_A", reply)
+        
+        # Should NOT include the quoted email at the end (after From: SENDER_NAME)
+        self.assertNotIn("From: SENDER_NAME SENDER_EMAIL", reply)
+        self.assertNotIn("Sent from Outlook for iOS", reply)
 
     def get_email(self, name):
         """ Return EmailMessage instance
